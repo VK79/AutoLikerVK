@@ -105,4 +105,3 @@ if __name__ == "__main__":
 
     checker = VKActivityChecker(config)
     asyncio.run(checker.run_check())
-    # input("Проверка завершена. Нажмите Enter для выхода...")

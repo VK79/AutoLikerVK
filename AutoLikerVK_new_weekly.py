@@ -13,6 +13,7 @@ from apscheduler.triggers.cron import CronTrigger
 logging.basicConfig(level=logging.INFO)
 
 
+
 class VKActivityChecker:
     def __init__(self, config: Dict):
         self.vk_session = vk_api.VkApi(token=config['vk']['access_token'])

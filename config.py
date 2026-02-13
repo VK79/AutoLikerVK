@@ -5,4 +5,4 @@ token_vk = 'vk1.a.RC6-0Pl_qjSZtNxZflWdisxzA2JVeKiTVpbg87fOQWYVkSgNgJucnQubFV7rvz
 # token_vk = 'vk1.a.2nr72BGOe1jmXBdKhE1gJNuQaXiBHip1kxGYB4d_JPkPYuIcJCY463YDNjYymo4vF1NNKNkk-vTwVRVfQJP41EUku4gJnG2a1U-MVJFutlX9oykr0vTC7ZBahHN6i0qZo0E6Dvm_mZ_UZWi_uxmV_Yhw4YpwGA1mYCPxxRI3vDen4qA9K-Pswk1YiMDqZQa5BLo1NekAkMiUju_mcShdRQ'
 group_id = '-151319174'		# Group id Like -1XXXXXXXX without ''
 chat_id = 1094254475
-users_id = ['10499245', '']
+users_id = ['10499245']
