@@ -27,6 +27,7 @@ async def main():
             posts = vk.wall.get(owner_id=group_id, count=10)
             # Можно увеличить "count" в зависимости от вашей потребности
 
+
             # Счетчик для отслеживания количества поставленных лайков
             likes_count = 0
             commented = False
