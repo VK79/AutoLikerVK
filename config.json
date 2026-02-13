@@ -1,0 +1,12 @@
+{
+  "vk": {
+    "access_token": "vk1.a.RC6-0Pl_qjSZtNxZflWdisxzA2JVeKiTVpbg87fOQWYVkSgNgJucnQubFV7rvzXqWf_zEwNPmM5Odqy5tQ0PbDgqR9jeDnSHrueemL4Z_3L-nGdgBfUgtIEyxMq-IPHCWXkH22FxUwxMHpSo_2HpfiD8ExNjcm6RgbqR2tMXZq0fGOTK7EAA8TSx2gdf389fwpay6ZT23w4hBJ5wcrq1Kg",
+    "group_id": -151319174
+  },
+  "telegram": {
+    "bot_token": "6820629702:AAH-k48b43iZzgdhvwLhoT3Zb9_KkMjDqr0"
+  },
+  "users": {
+    "Владимир": {"vk_id": 10499245, "tg_id": 1094254475}
+  }
+}

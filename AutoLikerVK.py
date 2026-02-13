@@ -38,7 +38,7 @@ async def main():
                 post_id = post['id']
                 commented_text = ''
                 liked_text = ''
-                #print(post_id)
+                # print(post_id)
                 comments = vk.wall.getComments(owner_id=group_id, post_id=post_id)['items']
                 # Проверяем, есть ли уже лайк на посте
                 likes = vk.likes.getList(type='post', owner_id=group_id, item_id=post_id)
@@ -46,11 +46,11 @@ async def main():
                     try:
                         vk.likes.add(type='post', owner_id= group_id, item_id=post_id)
                         text = f'Лайк поставлен на пост https://vk.com/wall{group_id}_{post_id}'
-                        await bot.send_message(chat_id, text, link_preview=False)
+                        await bot.send_message(chat_id, text)
                     except:
                         liked = False
                         liked_text = 'Нужно поставить ЛАЙК\n'
-                        print(liked_text)
+                        print(f'{post_id} {liked_text}')
                     likes_count += 1
 
                     # Если поставлено 10 лайков, делаем перерыв на 3 секунды
@@ -66,8 +66,10 @@ async def main():
                         commented = True
                         break
                     else:
-                        commented_text = f'Нужно оставить КОММЕНТАРИЙ \n'
-                        print(commented_text)
+                        commented = False
+                if commented is not True:
+                    commented_text = f'Нужно оставить КОММЕНТАРИЙ \n'
+                    print(f'{post_id} {commented_text}')
                 if commented is not True or liked is not True:
                     text = f'{liked_text}{commented_text}на пост https://vk.com/wall{group_id}_{post_id}'
                     await bot.send_message(chat_id, text)
