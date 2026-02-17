@@ -11,6 +11,8 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,7 +39,9 @@ class VKActivityChecker:
         self.dp = Dispatcher(storage=MemoryStorage())
         self.router = Router()
         self.dp.include_router(self.router)
+        self.scheduler = AsyncIOScheduler()
         self._setup_handlers()
+        self._setup_scheduler()  # ✅ Планировщик по понедельникам
 
     def _load_config(self) -> Dict:
         with open(self.config_file, 'r', encoding='utf-8') as f:
@@ -49,16 +53,51 @@ class VKActivityChecker:
         with open(self.config_file, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
 
+    # def _setup_scheduler(self):
+    #     """Добавляет задачу, но НЕ запускает (будет в run_bot)"""
+    #     trigger = CronTrigger(day_of_week='mon', hour=8, minute=5, timezone='Europe/Moscow')
+    #     self.scheduler.add_job(self._run_check, trigger)
+    #     logger.info("📅 Задача добавлена: понедельник 08:05 MSK")
+
+
     def _setup_handlers(self):
         @self.router.message(Command('admin'), F.from_user.id == self.admin_tg_id)
         async def admin_panel(message: Message):
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="➕ Добавить пользователя", callback_data="add_user")],
                 [InlineKeyboardButton(text="📋 Список пользователей", callback_data="list_users")],
-                [InlineKeyboardButton(text="🔍 Проверить неделю", callback_data="check_week")],
+                [InlineKeyboardButton(text="🔍 Проверить неделю (СЕЙЧАС)", callback_data="check_week")],
+                [InlineKeyboardButton(text="📅 Следующая проверка", callback_data="next_check")],
                 [InlineKeyboardButton(text="❌ Закрыть", callback_data="close_admin")]
             ])
-            await message.answer("🔧 Админ-панель", reply_markup=kb)
+            await message.answer("🔧 Админ-панель\n📅 Авто: по понедельникам 08:05", reply_markup=kb)
+
+    def _setup_scheduler(self):
+        """Добавляет задачу с ИМЕНИМ"""
+        trigger = CronTrigger(day_of_week='mon', hour=8, minute=5, timezone='Europe/Moscow')
+        self.scheduler.add_job(
+            self._run_check,
+            trigger,
+            id="weekly_vk_check",  # ✅ Уникальный ID
+            replace_existing=True
+        )
+        logger.info("📅 Задача 'weekly_vk_check' добавлена")
+
+        @self.router.callback_query(F.data == "next_check")
+        async def next_check(call: CallbackQuery):
+            try:
+                job = self.scheduler.get_job("weekly_vk_check")  # По ID
+                if job and job.next_run_time:
+                    time_str = job.next_run_time.strftime("%d.%m.%Y %H:%M")
+                    await call.message.answer(f"⏰ Понедельник: {time_str}")
+                elif job:
+                    await call.message.answer("⏰ Задача активна")
+                else:
+                    await call.message.answer("📅 Задача не найдена")
+            except Exception:
+                await call.message.answer("⏰ Планировщик не запущен")
+            await call.answer()
+
 
         @self.router.callback_query(F.data == "add_user", F.from_user.id == self.admin_tg_id)
         async def start_add_user(call: CallbackQuery, state: FSMContext):
@@ -113,9 +152,14 @@ class VKActivityChecker:
 
         @self.router.callback_query(F.data == "check_week")
         async def trigger_check(call: CallbackQuery):
-            await call.answer("🔍 Запуск проверки...")
+            await call.answer("🔍 Запуск проверки СЕЙЧАС...")
             asyncio.create_task(self._run_check())
-            await call.message.edit_text("✅ Проверка запущена! Уведомления отправлены.")
+            await call.message.edit_text("✅ Проверка запущена!\n📅 Авто: по понедельникам 08:05")
+
+        @self.router.callback_query(F.data == "close_admin")
+        async def close_admin(call: CallbackQuery):
+            await call.message.delete()
+            await call.answer()
 
     # Методы проверки (без изменений)
     def get_previous_week(self) -> Tuple[datetime, datetime]:
@@ -123,8 +167,6 @@ class VKActivityChecker:
         days_to_monday = today.weekday()
         prev_monday = today - timedelta(days=days_to_monday + 7)
         prev_sunday = prev_monday + timedelta(days=6)
-        # return prev_monday.replace(hour=0, minute=0, second=0, microsecond=0), \
-        #     prev_sunday.replace(hour=23, minute=59, second=59, microsecond=999999)
         return prev_monday.replace(hour=0, minute=0, second=0, microsecond=0), \
             today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
@@ -170,27 +212,47 @@ class VKActivityChecker:
                 if not has_l: what.append("👍 лайк")
                 if not has_c: what.append("💬 комментарий")
                 missing.append(f"{', '.join(what)} на пост {link}")
+
         if missing:
             tag_user = f'<a href="tg://user?id={tg_id}">{name}</a>'
             msg = f"{tag_user}\n❌ Вы забыли поставить:\n" + "\n".join(missing)
-            # print(self.group_tg_id, self.topic_tg_id)
-            await self.bot.send_message(self.group_tg_id, msg, parse_mode="HTML", message_thread_id=self.topic_tg_id, disable_web_page_preview=True)
-            logger.info(f"Уведомление отправлено {name}")
+            try:
+                await self.bot.send_message(
+                    self.group_tg_id, msg,
+                    parse_mode="HTML",
+                    message_thread_id=self.topic_tg_id,
+                    disable_web_page_preview=True
+                )
+                logger.info(f"✅ Уведомление {name}")
+            except Exception as e:
+                logger.error(f"❌ Ошибка отправки {name}: {e}")
+
 
     async def _run_check(self):
-        start, end = self.get_previous_week()
-        start_ts, end_ts = int(start.timestamp()), int(end.timestamp())
-        posts = self.get_week_posts(start_ts, end_ts)
-        logger.info(f"Найдено {len(posts)} постов")
+        try:
+            start, end = self.get_previous_week()
+            start_ts, end_ts = int(start.timestamp()), int(end.timestamp())
+            posts = self.get_week_posts(start_ts, end_ts)
+            logger.info(f"📊 Найдено {len(posts)} постов за неделю")
 
-        for name, data in self.users.items():
-            await self.check_user_activity(name, data['vk_id'], data['tg_id'], posts)
+            for name, data in self.users.items():
+                await self.check_user_activity(name, data['vk_id'], data['tg_id'], posts)
+        except Exception as e:
+            logger.error(f"❌ Ошибка проверки: {e}")
 
     async def run_bot(self):
-        """Запуск бота с polling."""
-        await self.dp.start_polling(self.bot)
+        """Запуск бота + scheduler"""
+        try:
+            self._setup_scheduler()  # ✅ ДО start()
+            self.scheduler.start()  # ✅ Scheduler активен
+            logger.info("🤖 Бот + планировщик запущены")
+            await self.dp.start_polling(self.bot)
+        finally:
+            await self.bot.session.close()
+            self.scheduler.shutdown()
 
 
 if __name__ == "__main__":
+    # pip install apscheduler
     checker = VKActivityChecker({})
     asyncio.run(checker.run_bot())
