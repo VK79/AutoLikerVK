@@ -53,12 +53,6 @@ class VKActivityChecker:
         with open(self.config_file, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
 
-    # def _setup_scheduler(self):
-    #     """Добавляет задачу, но НЕ запускает (будет в run_bot)"""
-    #     trigger = CronTrigger(day_of_week='mon', hour=8, minute=5, timezone='Europe/Moscow')
-    #     self.scheduler.add_job(self._run_check, trigger)
-    #     logger.info("📅 Задача добавлена: понедельник 08:05 MSK")
-
 
     def _setup_handlers(self):
         @self.router.message(Command('admin'), F.from_user.id == self.admin_tg_id)
@@ -146,7 +140,7 @@ class VKActivityChecker:
                 text = "📋 Список пуст"
             else:
                 text = "📋 Пользователи:\n" + "\n".join(
-                    [f"👤 {n}: VK{data['vk_id']} TG{data['tg_id']}" for n, data in self.users.items()])
+                    [f"👤 {n}: VK_id:{data['vk_id']} TG_id:{data['tg_id']}" for n, data in self.users.items()])
             await call.message.edit_text(text)
             await call.answer()
 
@@ -203,6 +197,7 @@ class VKActivityChecker:
 
     async def check_user_activity(self, name: str, vk_id: int, tg_id: int, posts: List[Dict]):
         missing = []
+
         for post in posts:
             link = f"https://vk.com/wall{abs(post['owner_id'])}_{post['id']}"
             has_l = self.has_like(vk_id, post)
@@ -228,15 +223,57 @@ class VKActivityChecker:
                 logger.error(f"❌ Ошибка отправки {name}: {e}")
 
 
+
     async def _run_check(self):
         try:
             start, end = self.get_previous_week()
             start_ts, end_ts = int(start.timestamp()), int(end.timestamp())
             posts = self.get_week_posts(start_ts, end_ts)
             logger.info(f"📊 Найдено {len(posts)} постов за неделю")
-
+            msg = f"✅ Проверка запущена!\n📅 Авто: по понедельникам 08:05\n\n📊 Найдено {len(posts)} постов за неделю"
+            try:
+                await self.bot.send_message(
+                    self.group_tg_id, msg,
+                    parse_mode="HTML",
+                    message_thread_id=self.topic_tg_id,
+                    disable_web_page_preview=True
+                )
+                logger.info(f"✅ Уведомление о начале проверки")
+            except Exception as e:
+                logger.error(f"❌ Ошибка отправки уведомления: {e}")
             for name, data in self.users.items():
                 await self.check_user_activity(name, data['vk_id'], data['tg_id'], posts)
+            msg = f"✅ Проверка завершена!"
+            try:
+                await self.bot.send_message(
+                    self.group_tg_id, msg,
+                    parse_mode="HTML",
+                    message_thread_id=self.topic_tg_id,
+                    disable_web_page_preview=True
+                )
+                logger.info(f"✅ Уведомление об окончании проверки")
+            except Exception as e:
+                logger.error(f"❌ Ошибка отправки уведомления: {e}")
+            try:
+                job = self.scheduler.get_job("weekly_vk_check")  # По ID
+                if job and job.next_run_time:
+                    time_str = job.next_run_time.strftime("%d.%m.%Y %H:%M")
+                    msg = f"⏰ Понедельник: {time_str}"
+                elif job:
+                    msg = "⏰ Задача активна"
+                else:
+                    msg = "📅 Задача не найдена"
+            except Exception:
+                msg = "⏰ Планировщик не запущен"
+            try:
+                await self.bot.send_message(
+                    self.group_tg_id, f"Автоматическая проверка: {msg}",
+                    parse_mode="HTML",
+                    message_thread_id=self.topic_tg_id,
+                    disable_web_page_preview=True
+                )
+            except Exception as e:
+                logger.error(f"❌ Ошибка отправки уведомления: {e}")
         except Exception as e:
             logger.error(f"❌ Ошибка проверки: {e}")
 
