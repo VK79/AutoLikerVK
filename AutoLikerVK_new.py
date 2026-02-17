@@ -5,6 +5,8 @@ from typing import Dict, List, Tuple
 import vk_api
 from aiogram import Bot
 
+from config import users_id
+
 
 class VKActivityChecker:
     def __init__(self, config: Dict):
@@ -65,6 +67,7 @@ class VKActivityChecker:
     async def check_user_activity(self, name: str, vk_id: int, tg_id: int, posts: List[Dict]):
         """Проверяет активность и отправляет уведомление."""
         missing = []
+        print(f"Проверка активности: {name}")
         for post in posts:
             has_l, has_c = False, False
             link = f"https://vk.com/wall{post['owner_id']}_{post['id']}"
@@ -80,9 +83,13 @@ class VKActivityChecker:
                 missing.append(f"{', '.join(what)} на пост {link}")
                 # print(missing)
         if missing:
-            msg = f"Вы забыли поставить\n{',\n'.join(missing)}"
-            await self.bot.send_message(tg_id, msg, disable_web_page_preview=True)
+            tag_user = f'<a href="tg://user?id={tg_id}">{name}</a>'
+            msg = f"{tag_user}, Вы забыли поставить\n{',\n'.join(missing)}"
+            await self.bot.send_message(tg_id, msg, parse_mode="HTML", disable_web_page_preview=True)
             print(f"Уведомление отправлено {name}")
+        else:
+            print(f"Уведомление НЕ отправлено {name}")
+
 
     async def run_check(self):
         """Запуск проверки за предыдущую неделю."""
