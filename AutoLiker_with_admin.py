@@ -199,7 +199,7 @@ class VKActivityChecker:
         missing = []
 
         for post in posts:
-            link = f"https://vk.com/wall{abs(post['owner_id'])}_{post['id']}"
+            link = f"https://vk.com/wall{post['owner_id']}_{post['id']}"
             has_l = self.has_like(vk_id, post)
             has_c = self.has_comment(vk_id, post)
             if not (has_l or has_c):
